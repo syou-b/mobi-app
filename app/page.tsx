@@ -4,6 +4,39 @@ import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import { Health } from "@capgo/capacitor-health";
+import { registerPlugin } from "@capacitor/core";
+
+// SleepHealth 플러그인 타입 정의
+interface SleepHealthPlugin {
+  requestAuthorization(): Promise<{ authorized: boolean }>;
+  readSleepSamples(options: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }): Promise<{
+    samples: Array<{
+      startDate: string;
+      endDate: string;
+      value: number;
+      categoryType: "inBed" | "asleep" | "awake" | "unknown";
+      sourceName?: string;
+      sourceId?: string;
+    }>;
+  }>;
+}
+
+// SleepHealth 플러그인 등록
+const SleepHealth = registerPlugin<SleepHealthPlugin>("SleepHealth", {
+  web: () =>
+    Promise.resolve({
+      requestAuthorization: async () => {
+        throw new Error("SleepHealth plugin is not available on web platform");
+      },
+      readSleepSamples: async () => {
+        throw new Error("SleepHealth plugin is not available on web platform");
+      },
+    }),
+});
 
 type LocationState = {
   lat: number;
@@ -12,9 +45,11 @@ type LocationState = {
 
 export default function Home() {
   const [healthData, setHealthData] = useState<unknown>(null);
+  const [sleepData, setSleepData] = useState<unknown>(null);
   const [location, setLocation] = useState<LocationState>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sleepError, setSleepError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -62,15 +97,12 @@ export default function Home() {
         endOfDay.setDate(endOfDay.getDate() + 1);
 
         // 2. 헬스 권한 요청 + 오늘 헬스 데이터 불러오기
-        //    읽고 싶은 타입은 필요에 따라 수정(예: "steps", "heart_rate" 등)
         console.log("[mobi] request health permissions");
         await Health.requestAuthorization({
           read: ["steps"],
         });
         console.log("[mobi] health permissions granted");
 
-        // 플러그인 버전에 따라 메서드/파라미터가 다를 수 있으니,
-        // 실제 리턴 구조는 console.log로 확인해서 필요하면 가공하세요.
         console.log("[mobi] read today health samples");
         const todayHealth = await Health.readSamples({
           startDate: startOfDay.toISOString(),
@@ -81,6 +113,30 @@ export default function Home() {
         console.log("[mobi] today health result", todayHealth);
 
         setHealthData(todayHealth);
+
+        // 3. 수면 데이터 권한 요청 및 데이터 불러오기
+        try {
+          console.log("[mobi] request sleep health permissions");
+          await SleepHealth.requestAuthorization();
+          console.log("[mobi] sleep health permissions granted");
+
+          console.log("[mobi] read today sleep samples");
+          const todaySleep = await SleepHealth.readSleepSamples({
+            startDate: startOfDay.toISOString(),
+            endDate: endOfDay.toISOString(),
+            limit: 100,
+          });
+          console.log("[mobi] today sleep result", todaySleep);
+          setSleepData(todaySleep);
+          setSleepError(null);
+        } catch (sleepErr) {
+          console.error("[mobi] sleep read error", sleepErr);
+          setSleepError(
+            sleepErr instanceof Error
+              ? sleepErr.message
+              : "수면 데이터를 불러오는 데 실패했어요. iOS 건강 앱에서 수면 데이터 접근을 허용했는지 확인해 주세요."
+          );
+        }
       } catch (e) {
         console.error(e);
         setError(
@@ -116,6 +172,21 @@ export default function Home() {
               </p>
               <pre className="max-h-64 overflow-auto rounded-md bg-black/80 p-3 text-[11px] text-zinc-100">
                 {JSON.stringify(healthData)}
+              </pre>
+            </section>
+
+            <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800">
+              <h2 className="mb-2 text-base font-medium">오늘 수면 데이터</h2>
+              <p className="mb-1 text-xs text-zinc-500">
+                지원 단말/권한에서만 동작하며, 구조는 콘솔 결과를 확인해 주세요.
+              </p>
+              {sleepError && (
+                <p className="mb-2 text-xs text-red-500 whitespace-pre-line">
+                  {sleepError}
+                </p>
+              )}
+              <pre className="max-h-64 overflow-auto rounded-md bg-black/80 p-3 text-[11px] text-zinc-100">
+                {JSON.stringify(sleepData)}
               </pre>
             </section>
 
