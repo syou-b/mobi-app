@@ -1,209 +1,267 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Capacitor } from "@capacitor/core";
-import { Geolocation } from "@capacitor/geolocation";
-import { Health } from "@capgo/capacitor-health";
-import { registerPlugin } from "@capacitor/core";
-
-// SleepHealth 플러그인 타입 정의
-interface SleepHealthPlugin {
-  requestAuthorization(): Promise<{ authorized: boolean }>;
-  readSleepSamples(options: {
-    startDate?: string;
-    endDate?: string;
-    limit?: number;
-  }): Promise<{
-    samples: Array<{
-      startDate: string;
-      endDate: string;
-      value: number;
-      categoryType: "inBed" | "asleep" | "awake" | "unknown";
-      sourceName?: string;
-      sourceId?: string;
-    }>;
-  }>;
-}
-
-// SleepHealth 플러그인 등록
-const SleepHealth = registerPlugin<SleepHealthPlugin>("SleepHealth", {
-  web: () =>
-    Promise.resolve({
-      requestAuthorization: async () => {
-        throw new Error("SleepHealth plugin is not available on web platform");
-      },
-      readSleepSamples: async () => {
-        throw new Error("SleepHealth plugin is not available on web platform");
-      },
-    }),
-});
-
-type LocationState = {
-  lat: number;
-  lng: number;
-} | null;
+import { useState, useEffect } from "react";
+import { HealthKitSleep, type SleepSample } from "capacitor-healthkit-sleep";
 
 export default function Home() {
-  const [healthData, setHealthData] = useState<unknown>(null);
-  const [sleepData, setSleepData] = useState<unknown>(null);
-  const [location, setLocation] = useState<LocationState>(null);
-  const [loading, setLoading] = useState(true);
+  const [isAvailable, setIsAvailable] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [sleepData, setSleepData] = useState<SleepSample[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sleepError, setSleepError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      // 웹 브라우저(Next dev/웹 빌드)에서는 Capacitor 플러그인이 동작하지 않으므로 무시
-      if (!Capacitor.isNativePlatform()) {
-        setError(
-          "네이티브 앱(아이폰)에서 실행했을 때만 헬스/위치 데이터를 불러올 수 있어요."
-        );
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        console.log("[mobi] load start");
-
-        // 0. 위치 권한 먼저 요청 + 현재 위치 한 번 가져오기
-        console.log("[mobi] request location permissions");
-        const locPerms = await Geolocation.requestPermissions();
-        console.log("[mobi] location permissions result", locPerms);
-
-        console.log("[mobi] get current position");
-        const currentPosition = await Geolocation.getCurrentPosition();
-        console.log("[mobi] current position", currentPosition);
-
-        setLocation({
-          lat: currentPosition.coords.latitude,
-          lng: currentPosition.coords.longitude,
-        });
-
-        // 1. 오늘 날짜 범위 계산 (자정 ~ 다음날 자정)
-        const now = new Date();
-        const startOfDay = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-          0,
-          0,
-          0,
-          0
-        );
-        const endOfDay = new Date(startOfDay);
-        endOfDay.setDate(endOfDay.getDate() + 1);
-
-        // 2. 헬스 권한 요청 + 오늘 헬스 데이터 불러오기
-        console.log("[mobi] request health permissions");
-        await Health.requestAuthorization({
-          read: ["steps"],
-        });
-        console.log("[mobi] health permissions granted");
-
-        console.log("[mobi] read today health samples");
-        const todayHealth = await Health.readSamples({
-          startDate: startOfDay.toISOString(),
-          endDate: endOfDay.toISOString(),
-          dataType: "steps",
-          limit: 1000,
-        });
-        console.log("[mobi] today health result", todayHealth);
-
-        setHealthData(todayHealth);
-
-        // 3. 수면 데이터 권한 요청 및 데이터 불러오기
-        try {
-          console.log("[mobi] request sleep health permissions");
-          await SleepHealth.requestAuthorization();
-          console.log("[mobi] sleep health permissions granted");
-
-          console.log("[mobi] read today sleep samples");
-          const todaySleep = await SleepHealth.readSleepSamples({
-            startDate: startOfDay.toISOString(),
-            endDate: endOfDay.toISOString(),
-            limit: 100,
-          });
-          console.log("[mobi] today sleep result", todaySleep);
-          setSleepData(todaySleep);
-          setSleepError(null);
-        } catch (sleepErr) {
-          console.error("[mobi] sleep read error", sleepErr);
-          setSleepError(
-            sleepErr instanceof Error
-              ? sleepErr.message
-              : "수면 데이터를 불러오는 데 실패했어요. iOS 건강 앱에서 수면 데이터 접근을 허용했는지 확인해 주세요."
-          );
-        }
-      } catch (e) {
-        console.error(e);
-        setError(
-          e instanceof Error
-            ? e.message
-            : "헬스/위치 데이터를 불러오는 중 오류가 발생했어요."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void load();
+    // HealthKit은 iOS에서만 사용 가능
+    setIsAvailable(true); // 일단 true로 설정
   }, []);
 
+  const requestPermission = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log("Requesting authorization...");
+      const result = await HealthKitSleep.requestAuthorization();
+      console.log("Authorization result:", result);
+
+      // granted와 authorized 둘 다 처리
+      const isAuthorized =
+        (result as any).granted || result.authorized || false;
+      setIsAuthorized(isAuthorized);
+
+      if (isAuthorized) {
+        alert("✅ 권한이 승인되었습니다!");
+      } else {
+        setError("권한이 거부되었습니다. 설정에서 권한을 허용해주세요.");
+      }
+    } catch (err: any) {
+      setError(`권한 요청 실패: ${err.message || JSON.stringify(err)}`);
+      console.error("Authorization failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const fetchSleepData = async (days: number = 7) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const result = await HealthKitSleep.readSleepSamples({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      });
+
+      console.log("Received data:", result);
+
+      setSleepData(result.samples || []);
+
+      if ((result.samples || []).length === 0) {
+        setError("선택한 기간에 수면 데이터가 없습니다.");
+      }
+    } catch (err: any) {
+      setError(`데이터 조회 실패: ${err.message || err}`);
+      console.error("Fetch failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSleepEmoji = (value: string) => {
+    switch (value) {
+      case "asleep":
+      case "asleepUnspecified":
+        return "😴";
+      case "inBed":
+        return "🛏️";
+      case "awake":
+        return "😳";
+      case "core":
+        return "💤";
+      case "deep":
+        return "🌙";
+      case "rem":
+        return "💭";
+      default:
+        return "😴";
+    }
+  };
+
+  const getSleepLabel = (value: string) => {
+    switch (value) {
+      case "asleep":
+      case "asleepUnspecified":
+        return "수면";
+      case "inBed":
+        return "침대에 있음";
+      case "awake":
+        return "깨어있음";
+      case "core":
+        return "코어 수면";
+      case "deep":
+        return "깊은 수면";
+      case "rem":
+        return "REM 수면";
+      default:
+        return value;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("ko-KR", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}시간 ${minutes}분`;
+  };
+
+  if (!isAvailable) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold mb-2">HealthKit 사용 불가</h1>
+          <p className="text-gray-600">
+            이 기능은 iOS 기기에서만 사용할 수 있습니다.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-xl flex-col gap-6 px-6 py-16 bg-white text-black dark:bg-zinc-900 dark:text-zinc-50">
-        <h1 className="text-2xl font-semibold">오늘 헬스 & 위치 데이터</h1>
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8 pt-8">
+          <div className="text-6xl mb-4">😴</div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            수면 데이터 분석
+          </h1>
+          <p className="text-gray-600">
+            Apple Health에서 수면 데이터를 가져옵니다
+          </p>
+        </div>
 
-        {loading && <p className="text-zinc-500">데이터 불러오는 중...</p>}
+        {/* Action Buttons */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="space-y-3">
+            {!isAuthorized && (
+              <button
+                onClick={requestPermission}
+                disabled={loading}
+                className="w-full py-4 px-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {loading ? "처리 중..." : "🔐 권한 요청하기"}
+              </button>
+            )}
 
-        {!loading && error && (
-          <p className="text-sm text-red-500 whitespace-pre-line">{error}</p>
+            {isAuthorized && (
+              <div className="space-y-2">
+                <button
+                  onClick={() => fetchSleepData(7)}
+                  disabled={loading}
+                  className="w-full py-4 px-6 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {loading ? "로딩 중..." : "📊 최근 7일 데이터 가져오기"}
+                </button>
+
+                <button
+                  onClick={() => fetchSleepData(30)}
+                  disabled={loading}
+                  className="w-full py-4 px-6 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {loading ? "로딩 중..." : "📅 최근 30일 데이터 가져오기"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {isAuthorized && (
+            <div className="mt-4 p-3 bg-green-50 rounded-lg">
+              <p className="text-sm text-green-700 text-center">
+                ✅ 권한이 승인되었습니다
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
         )}
 
-        {!loading && !error && (
-          <>
-            <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800">
-              <h2 className="mb-2 text-base font-medium">오늘 헬스 데이터</h2>
-              <p className="mb-1 text-xs text-zinc-500">
-                실제 구조는 콘솔에서 확인 후 필요한 값만 뽑아서 사용하세요.
-              </p>
-              <pre className="max-h-64 overflow-auto rounded-md bg-black/80 p-3 text-[11px] text-zinc-100">
-                {JSON.stringify(healthData)}
-              </pre>
-            </section>
+        {/* Sleep Data List */}
+        {sleepData.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              수면 기록 ({sleepData.length}개)
+            </h2>
 
-            <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800">
-              <h2 className="mb-2 text-base font-medium">오늘 수면 데이터</h2>
-              <p className="mb-1 text-xs text-zinc-500">
-                지원 단말/권한에서만 동작하며, 구조는 콘솔 결과를 확인해 주세요.
-              </p>
-              {sleepError && (
-                <p className="mb-2 text-xs text-red-500 whitespace-pre-line">
-                  {sleepError}
-                </p>
-              )}
-              <pre className="max-h-64 overflow-auto rounded-md bg-black/80 p-3 text-[11px] text-zinc-100">
-                {JSON.stringify(sleepData)}
-              </pre>
-            </section>
+            <div className="space-y-3">
+              {sleepData.map((sample, index) => (
+                <div
+                  key={index}
+                  className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-3xl">
+                        {getSleepEmoji(sample.value.toString())}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-800">
+                          {getSleepLabel(sample.value.toString())}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatDate(sample.startDate)} ~{" "}
+                          {formatDate(sample.endDate)}
+                        </div>
+                        <div className="text-sm font-medium text-blue-600 mt-1">
+                          {calculateDuration(sample.startDate, sample.endDate)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-            <section className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-800">
-              <h2 className="mb-2 text-base font-medium">현재 위치</h2>
-              {location ? (
-                <div className="space-y-1">
-                  <p>위도: {location.lat}</p>
-                  <p>경도: {location.lng}</p>
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <div className="text-xs text-gray-400">
+                      출처: {sample.sourceName}
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-zinc-500">위치 정보를 가져오지 못했어요.</p>
-              )}
-            </section>
-          </>
+              ))}
+            </div>
+          </div>
         )}
-      </main>
+
+        {/* Empty State */}
+        {sleepData.length === 0 && !loading && !error && isAuthorized && (
+          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div className="text-6xl mb-4">🌙</div>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+              아직 데이터가 없습니다
+            </h3>
+            <p className="text-gray-500">
+              버튼을 눌러 수면 데이터를 가져오세요
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ PODS:
   - CapacitorGeolocation (7.1.6):
     - Capacitor
     - IONGeolocationLib (= 1.0.1)
-  - CapgoCapacitorHealth (7.2.14):
+  - CapacitorHealthkitSleep (0.0.1):
     - Capacitor
   - IONGeolocationLib (1.0.1)
 
@@ -13,7 +13,7 @@ DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
-  - "CapgoCapacitorHealth (from `../../node_modules/@capgo/capacitor-health`)"
+  - CapacitorHealthkitSleep (from `../../capacitor-healthkit-sleep`)
 
 SPEC REPOS:
   trunk:
@@ -26,16 +26,16 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorGeolocation:
     :path: "../../node_modules/@capacitor/geolocation"
-  CapgoCapacitorHealth:
-    :path: "../../node_modules/@capgo/capacitor-health"
+  CapacitorHealthkitSleep:
+    :path: "../../capacitor-healthkit-sleep"
 
 SPEC CHECKSUMS:
   Capacitor: 358dd1c3fdd71d969547b17e159fd8a7736cb45f
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
   CapacitorGeolocation: a65213fef581c7b8c5d486abbd5a6d00192a179e
-  CapgoCapacitorHealth: 0a2caea2db8d204f477abdc724d6c8fc71b19764
+  CapacitorHealthkitSleep: fbf09cf3c4a3531e10102f5964295efe1f972bdb
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
 
-PODFILE CHECKSUM: 8c561daddcbc3af217f1ea8ab31223b2bf3ba926
+PODFILE CHECKSUM: 3f3aa9e7fdfdfc4fa75a6a8701742b7b52025b72
 
 COCOAPODS: 1.16.2
