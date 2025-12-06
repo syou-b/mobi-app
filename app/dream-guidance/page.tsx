@@ -178,6 +178,20 @@ export default function DreamGuidance() {
 
         {/* Question Card */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          {/* Question */}
+          <div className="mb-4">
+            <label className="block text-lg font-bold text-gray-800 mb-4">
+              {currentQuestion.question}
+            </label>
+            <textarea
+              value={currentAnswer}
+              onChange={(e) => setCurrentAnswer(e.target.value)}
+              placeholder="자유롭게 답변해주세요..."
+              className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400"
+              autoFocus
+            />
+          </div>
+
           {/* Sleep Context */}
           <div className="bg-blue-50 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-2">
@@ -192,31 +206,17 @@ export default function DreamGuidance() {
               </div>
             </div>
           </div>
-
-          {/* Question */}
-          <div className="mb-4">
-            <label className="block text-lg font-bold text-gray-800 mb-4">
-              {currentQuestion.question}
-            </label>
-            <textarea
-              value={currentAnswer}
-              onChange={(e) => setCurrentAnswer(e.target.value)}
-              placeholder="자유롭게 답변해주세요..."
-              className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400"
-              autoFocus
-            />
-          </div>
         </div>
 
         {/* Initial Dream Reference */}
-        {initialDream && (
+        {/* {initialDream && (
           <div className="bg-purple-50 rounded-2xl p-4 mb-6">
             <div className="text-xs font-semibold text-purple-900 mb-2">
               처음에 적은 내용:
             </div>
             <p className="text-sm text-purple-800 italic">"{initialDream}"</p>
           </div>
-        )}
+        )} */}
 
         {/* Action Buttons */}
         <div className="space-y-3 pb-8">

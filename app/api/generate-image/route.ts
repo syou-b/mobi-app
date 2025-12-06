@@ -5,16 +5,16 @@ export async function POST(request: NextRequest) {
   try {
     const { narrative, initialDream } = await request.json();
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_API_KEY_IMAGE = process.env.GEMINI_API_KEY_IMAGE;
 
-    if (!GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY_IMAGE) {
       return NextResponse.json(
         { error: "GEMINI_API_KEY not configured" },
         { status: 500 }
       );
     }
 
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY_IMAGE });
 
     // 이미지 생성 프롬프트 구성
     const prompt = `Create a dreamlike, surreal image based on this dream narrative:
