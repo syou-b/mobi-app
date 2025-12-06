@@ -13,6 +13,7 @@
     "@capacitor/core": "^7.4.4",
     "@capacitor/geolocation": "^7.1.6",
     "@capacitor/ios": "^7.4.4",
+    "@google/genai": "^1.31.0",
     "capacitor-healthkit-sleep": "file:capacitor-healthkit-sleep",
     "next": "16.0.6",
     "react": "19.2.0",

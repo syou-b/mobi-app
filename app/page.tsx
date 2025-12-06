@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { HealthKitSleep, type SleepSample } from "capacitor-healthkit-sleep";
 import testData from "./testData.json";
 
 export default function Home() {
+  const router = useRouter();
   const [isAvailable, setIsAvailable] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [sleepData, setSleepData] = useState<SleepSample[]>([]);
@@ -205,6 +207,24 @@ export default function Home() {
     const deepMinutes = calcTotalMinutes(deep);
     const remMinutes = calcTotalMinutes(rem);
 
+    // 꿈 기록 시작 함수
+    const handleStartDreamRecording = () => {
+      // 오늘의 수면 데이터를 localStorage에 저장
+      const sleepContext = {
+        date,
+        samples,
+        inBed,
+        asleep,
+        deepMinutes,
+        remMinutes,
+        coreMinutes: calcTotalMinutes(core),
+        awakeMinutes: calcTotalMinutes(awake),
+      };
+
+      localStorage.setItem("todaySleepData", JSON.stringify(sleepContext));
+      router.push("/dream-recording");
+    };
+
     if (!inBed) return null;
 
     const bedStart = new Date(inBed.startDate).getTime();
@@ -321,6 +341,17 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* 꿈 기록하기 버튼 - 오늘 수면에만 표시 */}
+        {isToday && (
+          <button
+            onClick={handleStartDreamRecording}
+            className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+          >
+            <span className="text-xl">💭</span>
+            <span>꿈 기록하기</span>
+          </button>
+        )}
       </div>
     );
   };
