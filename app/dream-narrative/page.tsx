@@ -20,6 +20,10 @@ export default function DreamNarrative() {
   const [initialDream, setInitialDream] = useState("");
   const [answers, setAnswers] = useState<Question[]>([]);
 
+  // 이미지 생성 관련
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
   useEffect(() => {
     // localStorage에서 데이터 로드
     const dreamText = localStorage.getItem("initialDream");
@@ -90,6 +94,49 @@ export default function DreamNarrative() {
   const handleSaveEdit = () => {
     setNarrative(editedNarrative);
     setIsEditing(false);
+  };
+
+  const generateImage = async () => {
+    setIsGeneratingImage(true);
+
+    try {
+      const finalNarrative = isEditing ? editedNarrative : narrative;
+
+      const response = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          narrative: finalNarrative,
+          initialDream,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate image");
+      }
+
+      const data = await response.json();
+      setImageUrl(data.imageUrl);
+    } catch (error) {
+      console.error("Error generating image:", error);
+      alert("이미지 생성 중 오류가 발생했습니다.");
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleCompleteJournal = () => {
+    // 최종 데이터 저장
+    const finalNarrative = isEditing ? editedNarrative : narrative;
+    localStorage.setItem("dreamNarrative", finalNarrative);
+    if (imageUrl) {
+      localStorage.setItem("dreamImage", imageUrl);
+    }
+
+    // 최종 저널 페이지로 이동
+    router.push("/dream-journal");
   };
 
   if (isGenerating) {
@@ -173,6 +220,53 @@ export default function DreamNarrative() {
           )}
         </div>
 
+        {/* Image Generation Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span>🖼️</span>
+            <span>꿈 이미지</span>
+          </h3>
+
+          {imageUrl ? (
+            <div>
+              <div className="relative rounded-xl overflow-hidden mb-4">
+                <img
+                  src={imageUrl}
+                  alt="Dream visualization"
+                  className="w-full h-auto"
+                />
+              </div>
+              <button
+                onClick={generateImage}
+                disabled={isGeneratingImage}
+                className="w-full py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors disabled:opacity-50"
+              >
+                {isGeneratingImage ? "생성 중..." : "다시 생성하기"}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-gray-600 mb-4">
+                서사를 바탕으로 꿈의 이미지를 생성합니다
+              </p>
+              <button
+                onClick={generateImage}
+                disabled={isGeneratingImage}
+                className="w-full py-4 px-6 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGeneratingImage ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="inline-block animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                    <span>이미지 생성 중...</span>
+                  </span>
+                ) : (
+                  "이미지 생성하기"
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Original Content Reference */}
         <div className="bg-purple-50 rounded-2xl p-6 mb-6">
           <h3 className="text-sm font-semibold text-purple-900 mb-3">
@@ -203,12 +297,21 @@ export default function DreamNarrative() {
 
         {/* Action Buttons */}
         <div className="space-y-3 pb-8">
-          <button
-            onClick={handleSave}
-            className="w-full py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl"
-          >
-            다음 단계로 (이미지 생성)
-          </button>
+          {imageUrl ? (
+            <button
+              onClick={handleCompleteJournal}
+              className="w-full py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl"
+            >
+              저널 완성하기 ✨
+            </button>
+          ) : (
+            <button
+              disabled
+              className="w-full py-4 px-6 bg-gray-300 text-gray-500 font-semibold rounded-xl cursor-not-allowed"
+            >
+              이미지를 생성해주세요
+            </button>
+          )}
 
           <button
             onClick={() => {
@@ -219,7 +322,7 @@ export default function DreamNarrative() {
             }}
             className="w-full py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
           >
-            다시 생성하기
+            서사 다시 생성하기
           </button>
         </div>
       </div>
