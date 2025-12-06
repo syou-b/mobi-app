@@ -13,6 +13,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useTestData, setUseTestData] = useState(false);
+  const [hasJournal, setHasJournal] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  useEffect(() => {
+    // 오늘 저널이 있는지 확인
+    const checkJournal = () => {
+      const narrative = localStorage.getItem("dreamNarrative");
+      setHasJournal(!!narrative);
+    };
+
+    checkJournal();
+  }, []);
 
   useEffect(() => {
     // 앱 시작 시 자동으로 권한 요청
@@ -345,11 +357,15 @@ export default function Home() {
         {/* 꿈 기록하기 버튼 - 오늘 수면에만 표시 */}
         {isToday && (
           <button
-            onClick={handleStartDreamRecording}
+            onClick={
+              hasJournal
+                ? () => router.push("/dream-journal")
+                : handleStartDreamRecording
+            }
             className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
           >
-            <span className="text-xl">💭</span>
-            <span>꿈 기록하기</span>
+            <span className="text-xl">{hasJournal ? "📖" : "💭"}</span>
+            <span>{hasJournal ? "저널 보기" : "꿈 기록하기"}</span>
           </button>
         )}
       </div>
@@ -451,24 +467,46 @@ export default function Home() {
               </div>
             )}
 
-            {/* 이전 기록 */}
+            {/* 이전 기록 - Accordion */}
             {otherDays.length > 0 && (
-              <div>
-                <div className="mb-4">
-                  <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                    📊 Sleep History
-                  </h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {otherDays.length}일간의 기록
-                  </p>
-                </div>
-                <div className="space-y-4">
-                  {otherDays.map(([date, samples]) => (
-                    <div key={date}>
-                      {renderSleepCard(date, samples, false)}
-                    </div>
-                  ))}
-                </div>
+              <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <button
+                  onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                  className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="text-left">
+                    <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                      📊 Sleep History
+                    </h2>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {otherDays.length}일간의 기록
+                    </p>
+                  </div>
+                  <svg
+                    className={`w-6 h-6 text-gray-400 transition-transform ${isHistoryOpen ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+
+                {isHistoryOpen && (
+                  <div className="px-6 pb-6 space-y-4 border-t border-gray-100">
+                    <div className="pt-4"></div>
+                    {otherDays.map(([date, samples]) => (
+                      <div key={date}>
+                        {renderSleepCard(date, samples, false)}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

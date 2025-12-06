@@ -23,6 +23,36 @@ export default function DreamJournal() {
   const [initialDream, setInitialDream] = useState("");
   const [sleepAnalysis, setSleepAnalysis] = useState("");
   const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(true);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && currentSlide < 1) {
+      setCurrentSlide(currentSlide + 1);
+    }
+
+    if (isRightSwipe && currentSlide > 0) {
+      setCurrentSlide(currentSlide - 1);
+    }
+
+    setTouchStart(0);
+    setTouchEnd(0);
+  };
 
   useEffect(() => {
     // localStorage에서 모든 데이터 로드
@@ -30,6 +60,7 @@ export default function DreamJournal() {
     const narrativeText = localStorage.getItem("dreamNarrative");
     const image = localStorage.getItem("dreamImage"); // 이미지는 선택사항
     const dreamText = localStorage.getItem("initialDream");
+    const savedAnalysis = localStorage.getItem("sleepAnalysis"); // 저장된 분석
 
     if (!sleepDataStr || !narrativeText || !dreamText) {
       alert("데이터를 불러올 수 없습니다.");
@@ -43,8 +74,13 @@ export default function DreamJournal() {
     setImageUrl(image || ""); // 이미지 없으면 빈 문자열
     setInitialDream(dreamText);
 
-    // 수면 분석 생성
-    generateSleepAnalysis(sleepContext, narrativeText);
+    // 저장된 분석이 있으면 사용, 없으면 생성
+    if (savedAnalysis) {
+      setSleepAnalysis(savedAnalysis);
+      setIsGeneratingAnalysis(false);
+    } else {
+      generateSleepAnalysis(sleepContext, narrativeText);
+    }
   }, []);
 
   const generateSleepAnalysis = async (
@@ -71,6 +107,9 @@ export default function DreamJournal() {
 
       const data = await response.json();
       setSleepAnalysis(data.analysis);
+
+      // localStorage에 저장
+      localStorage.setItem("sleepAnalysis", data.analysis);
     } catch (error) {
       console.error("Error generating analysis:", error);
       setSleepAnalysis("수면 분석을 생성할 수 없습니다.");
@@ -94,12 +133,6 @@ export default function DreamJournal() {
     return `${hours}시간 ${mins}분`;
   };
 
-  const handleSave = () => {
-    // TODO: 실제 저장 로직 (DB 또는 로컬 저장)
-    alert("저널이 저장되었습니다!");
-    router.push("/");
-  };
-
   if (isGeneratingAnalysis) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50 flex items-center justify-center p-4">
@@ -121,130 +154,256 @@ export default function DreamJournal() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50 p-4">
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50 pt-12">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="pt-8 pb-6">
-          <div className="text-center mb-8">
-            <div className="text-6xl mb-4">✨</div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">꿈 일기</h1>
-            <p className="text-gray-600">
-              {new Date(sleepData.date).toLocaleDateString("ko-KR", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
+        {/* Header with Back Button - iOS Safe Area */}
+        <div
+          className="pb-4 px-4 sticky top-0 bg-gradient-to-b from-purple-50 to-transparent z-10"
+          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+        >
+          <div className="pt-4">
+            <button
+              onClick={() => router.push("/")}
+              className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span className="font-medium">뒤로</span>
+            </button>
           </div>
         </div>
 
-        {/* Sleep Chart */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📊</span>
-            <span>수면 타임라인</span>
-          </h2>
+        <div className="px-4">
+          {/* Title */}
+          <div className="pb-6">
+            <div className="text-center">
+              <div className="text-6xl mb-4">✨</div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">꿈 일기</h1>
+              <p className="text-gray-600">
+                {new Date(sleepData.date).toLocaleDateString("ko-KR", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+          </div>
 
-          {/* Sleep Timeline Visualization */}
-          {sleepData.inBed && (
-            <div className="space-y-4">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">😴 총 수면</div>
-                  <div className="text-lg font-semibold text-blue-600">
-                    {sleepData.asleep
-                      ? formatMinutes(
-                          (new Date(sleepData.asleep.endDate).getTime() -
-                            new Date(sleepData.asleep.startDate).getTime()) /
-                            60000
+          {/* Sleep Chart */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span>📊</span>
+              <span>수면 타임라인</span>
+            </h2>
+
+            {/* Sleep Timeline Visualization */}
+            {sleepData.inBed && (
+              <div className="space-y-4">
+                {/* Visual Timeline */}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{formatTime(sleepData.inBed.startDate)}</span>
+                    <span>{formatTime(sleepData.inBed.endDate)}</span>
+                  </div>
+                  <div className="relative h-12 bg-gray-100 rounded-lg overflow-hidden">
+                    {sleepData.samples
+                      .filter((s: any) =>
+                        ["deep", "core", "rem", "awake"].includes(
+                          s.categoryType
                         )
-                      : "N/A"}
+                      )
+                      .map((stage: any, idx: number) => {
+                        const bedStart = new Date(
+                          sleepData.inBed.startDate
+                        ).getTime();
+                        const bedEnd = new Date(
+                          sleepData.inBed.endDate
+                        ).getTime();
+                        const totalDuration = bedEnd - bedStart;
+
+                        const stageStart = new Date(stage.startDate).getTime();
+                        const stageEnd = new Date(stage.endDate).getTime();
+                        const left =
+                          ((stageStart - bedStart) / totalDuration) * 100;
+                        const width =
+                          ((stageEnd - stageStart) / totalDuration) * 100;
+
+                        const colorMap: { [key: string]: string } = {
+                          deep: "bg-indigo-600",
+                          core: "bg-blue-400",
+                          rem: "bg-purple-400",
+                          awake: "bg-orange-300",
+                        };
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`absolute h-full ${colorMap[stage.categoryType]}`}
+                            style={{
+                              left: `${left}%`,
+                              width: `${width}%`,
+                            }}
+                          />
+                        );
+                      })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-3 mt-3 text-xs">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-indigo-600 rounded"></div>
+                      <span className="text-gray-600">깊은 수면</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-blue-400 rounded"></div>
+                      <span className="text-gray-600">코어 수면</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-purple-400 rounded"></div>
+                      <span className="text-gray-600">REM</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-orange-300 rounded"></div>
+                      <span className="text-gray-600">깨어있음</span>
+                    </div>
                   </div>
                 </div>
-                <div className="bg-indigo-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">🌙 깊은 수면</div>
-                  <div className="text-lg font-semibold text-indigo-600">
-                    {formatMinutes(sleepData.deepMinutes)}
+
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 mb-1">😴 총 수면</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {sleepData.asleep
+                        ? formatMinutes(
+                            (new Date(sleepData.asleep.endDate).getTime() -
+                              new Date(sleepData.asleep.startDate).getTime()) /
+                              60000
+                          )
+                        : "N/A"}
+                    </div>
                   </div>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">💭 REM</div>
-                  <div className="text-lg font-semibold text-purple-600">
-                    {formatMinutes(sleepData.remMinutes)}
+                  <div className="bg-indigo-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 mb-1">
+                      🌙 깊은 수면
+                    </div>
+                    <div className="text-lg font-semibold text-indigo-600">
+                      {formatMinutes(sleepData.deepMinutes)}
+                    </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">⏰ 시간</div>
-                  <div className="text-sm font-semibold text-gray-600">
-                    {formatTime(sleepData.inBed.startDate)} -{" "}
-                    {formatTime(sleepData.inBed.endDate)}
+                  <div className="bg-purple-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 mb-1">💭 REM</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {formatMinutes(sleepData.remMinutes)}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500 mb-1">⏰ 시간</div>
+                    <div className="text-sm font-semibold text-gray-600">
+                      {formatTime(sleepData.inBed.startDate)} -{" "}
+                      {formatTime(sleepData.inBed.endDate)}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Sleep Analysis */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>💡</span>
-            <span>수면 & 꿈 분석</span>
-          </h2>
-          <div className="prose prose-sm max-w-none">
-            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {sleepAnalysis}
-            </p>
+            )}
           </div>
-        </div>
 
-        {/* Dream Image - Only show if image exists */}
-        {imageUrl && (
+          {/* Sleep Analysis */}
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span>🖼️</span>
-              <span>꿈 이미지</span>
+              <span>💡</span>
+              <span>수면 & 꿈 분석</span>
             </h2>
-            <div className="rounded-xl overflow-hidden">
-              <img
-                src={imageUrl}
-                alt="Dream visualization"
-                className="w-full h-auto"
-              />
+            <div className="prose prose-sm max-w-none">
+              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {sleepAnalysis}
+              </p>
             </div>
           </div>
-        )}
 
-        {/* Dream Narrative */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span>📖</span>
-            <span>꿈 이야기</span>
-          </h2>
-          <div className="prose prose-lg max-w-none">
-            <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-              {narrative}
-            </p>
+          {/* Dream Image & Narrative Carousel */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span>💭</span>
+              <span>꿈 기록</span>
+            </h2>
+
+            <div className="relative">
+              {/* Carousel Container */}
+              <div
+                className="overflow-hidden rounded-xl"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                <div
+                  className="flex transition-transform duration-300 ease-in-out"
+                  style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                >
+                  {/* Slide 1: Image (if exists) */}
+                  {imageUrl && (
+                    <div className="min-w-full">
+                      <div className="rounded-xl overflow-hidden bg-gray-50">
+                        <img
+                          src={imageUrl}
+                          alt="Dream visualization"
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Slide 2: Narrative */}
+                  <div className="min-w-full">
+                    <div className="bg-purple-50 rounded-xl p-6 min-h-[300px] flex items-center">
+                      <div className="prose prose-lg max-w-none w-full">
+                        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                          {narrative}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dots Indicator */}
+              {imageUrl && (
+                <div className="flex justify-center gap-2 mt-4">
+                  <button
+                    onClick={() => setCurrentSlide(0)}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      currentSlide === 0 ? "bg-purple-600 w-8" : "bg-gray-300"
+                    }`}
+                  />
+                  <button
+                    onClick={() => setCurrentSlide(1)}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      currentSlide === 1 ? "bg-purple-600 w-8" : "bg-gray-300"
+                    }`}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="space-y-3 pb-8">
-          <button
-            onClick={handleSave}
-            className="w-full py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl"
-          >
-            저널 저장하기
-          </button>
-
-          <button
-            onClick={() => router.push("/")}
-            className="w-full py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
-          >
-            홈으로 돌아가기
-          </button>
-        </div>
+        {/* Bottom Padding for Safe Area */}
+        <div
+          className="pb-8"
+          style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}
+        ></div>
       </div>
     </div>
   );
