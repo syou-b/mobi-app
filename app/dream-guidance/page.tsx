@@ -115,12 +115,14 @@ export default function DreamGuidance() {
   };
 
   const handleComplete = () => {
-    // TODO: 다음 페이지로 이동 (서사화/이미지 생성)
+    // 답변들을 localStorage에 저장
+    localStorage.setItem("dreamAnswers", JSON.stringify(questions));
+
     console.log("Initial Dream:", initialDream);
     console.log("Answers:", questions);
 
-    // 임시로 홈으로
-    router.push("/");
+    // 서사 생성 페이지로 이동
+    router.push("/dream-narrative");
   };
 
   if (isGenerating) {
