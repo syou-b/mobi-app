@@ -16,6 +16,24 @@ export default function Home() {
   const [hasJournal, setHasJournal] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
+  const loadTestData = () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // testData.json의 구조가 { samples: [...] } 형태
+      const samples = (testData as any).samples || testData;
+      setSleepData(samples as SleepSample[]);
+      setUseTestData(true);
+      console.log("Test data loaded:", samples.length, "samples");
+    } catch (err: any) {
+      setError(`테스트 데이터 로드 실패: ${err.message || err}`);
+      console.error("Test data load failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     // 오늘 저널이 있는지 확인
     const checkJournal = () => {
@@ -24,6 +42,9 @@ export default function Home() {
     };
 
     checkJournal();
+
+    // 자동으로 테스트 데이터 로드
+    loadTestData();
   }, []);
 
   useEffect(() => {
@@ -55,53 +76,35 @@ export default function Home() {
     initializeHealthKit();
   }, []);
 
-  const loadTestData = () => {
-    setLoading(true);
-    setError(null);
+  // const fetchSleepData = async (days: number = 365) => {
+  //   setLoading(true);
+  //   setError(null);
+  //   setUseTestData(false);
 
-    try {
-      // testData.json의 구조가 { samples: [...] } 형태
-      const samples = (testData as any).samples || testData;
-      setSleepData(samples as SleepSample[]);
-      setUseTestData(true);
-      console.log("Test data loaded:", samples.length, "samples");
-    } catch (err: any) {
-      setError(`테스트 데이터 로드 실패: ${err.message || err}`);
-      console.error("Test data load failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //   try {
+  //     const endDate = new Date();
+  //     const startDate = new Date();
+  //     startDate.setDate(startDate.getDate() - days);
 
-  const fetchSleepData = async (days: number = 365) => {
-    setLoading(true);
-    setError(null);
-    setUseTestData(false);
+  //     const result = await HealthKitSleep.readSleepSamples({
+  //       startDate: startDate.toISOString(),
+  //       endDate: endDate.toISOString(),
+  //     });
 
-    try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+  //     console.log("Received data:", result);
 
-      const result = await HealthKitSleep.readSleepSamples({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      });
+  //     setSleepData(result.samples || []);
 
-      console.log("Received data:", result);
-
-      setSleepData(result.samples || []);
-
-      if ((result.samples || []).length === 0) {
-        setError(`선택한 기간(${days}일)에 수면 데이터가 없습니다.`);
-      }
-    } catch (err: any) {
-      setError(`데이터 조회 실패: ${err.message || err}`);
-      console.error("Fetch failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     if ((result.samples || []).length === 0) {
+  //       setError(`선택한 기간(${days}일)에 수면 데이터가 없습니다.`);
+  //     }
+  //   } catch (err: any) {
+  //     setError(`데이터 조회 실패: ${err.message || err}`);
+  //     console.error("Fetch failed:", err);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const calculateDuration = (start: string, end: string) => {
     const startDate = new Date(start);
@@ -398,51 +401,6 @@ export default function Home() {
           <p className="text-gray-600">
             Apple Health에서 수면 데이터를 가져옵니다
           </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          {isAuthorized && (
-            <div className="space-y-3">
-              <button
-                onClick={() => fetchSleepData(7)}
-                disabled={loading}
-                className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                {loading ? "로딩 중..." : "일주일 데이터 가져오기"}
-              </button>
-
-              <button
-                onClick={loadTestData}
-                disabled={loading}
-                className="w-full py-4 px-6 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                {loading ? "로딩 중..." : "테스트 데이터 가져오기 (7일)"}
-              </button>
-            </div>
-          )}
-
-          {isAuthorized ? (
-            <div className="mt-4 p-3 bg-green-50 rounded-lg">
-              <p className="text-sm text-green-700 text-center">
-                ✅ 권한이 승인되었습니다
-              </p>
-            </div>
-          ) : loading ? (
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-700 text-center">
-                🔄 권한을 요청하는 중...
-              </p>
-            </div>
-          ) : null}
-
-          {useTestData && (
-            <div className="mt-4 p-3 bg-purple-50 rounded-lg">
-              <p className="text-sm text-purple-700 text-center">
-                🧪 테스트 데이터를 사용 중입니다
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Error Message */}
