@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getCurrentJournal, updateCurrentJournal } from "../lib/journalStorage";
 
 interface SleepContext {
   date: string;
@@ -55,31 +56,31 @@ export default function DreamJournal() {
   };
 
   useEffect(() => {
-    // localStorage에서 모든 데이터 로드
-    const sleepDataStr = localStorage.getItem("todaySleepData");
-    const narrativeText = localStorage.getItem("dreamNarrative");
-    const image = localStorage.getItem("dreamImage"); // 이미지는 선택사항
-    const dreamText = localStorage.getItem("initialDream");
-    const savedAnalysis = localStorage.getItem("sleepAnalysis"); // 저장된 분석
+    // 현재 저널 로드
+    const journal = getCurrentJournal();
 
-    if (!sleepDataStr || !narrativeText || !dreamText) {
+    if (
+      !journal ||
+      !journal.sleepData ||
+      !journal.narrative ||
+      !journal.initialDream
+    ) {
       alert("데이터를 불러올 수 없습니다.");
       router.push("/");
       return;
     }
 
-    const sleepContext = JSON.parse(sleepDataStr);
-    setSleepData(sleepContext);
-    setNarrative(narrativeText);
-    setImageUrl(image || ""); // 이미지 없으면 빈 문자열
-    setInitialDream(dreamText);
+    setSleepData(journal.sleepData);
+    setNarrative(journal.narrative);
+    setImageUrl(journal.image || "");
+    setInitialDream(journal.initialDream);
 
     // 저장된 분석이 있으면 사용, 없으면 생성
-    if (savedAnalysis) {
-      setSleepAnalysis(savedAnalysis);
+    if (journal.sleepAnalysis) {
+      setSleepAnalysis(journal.sleepAnalysis);
       setIsGeneratingAnalysis(false);
     } else {
-      generateSleepAnalysis(sleepContext, narrativeText);
+      generateSleepAnalysis(journal.sleepData, journal.narrative);
     }
   }, []);
 
@@ -108,8 +109,8 @@ export default function DreamJournal() {
       const data = await response.json();
       setSleepAnalysis(data.analysis);
 
-      // localStorage에 저장
-      localStorage.setItem("sleepAnalysis", data.analysis);
+      // 현재 저널에 저장
+      updateCurrentJournal({ sleepAnalysis: data.analysis });
     } catch (error) {
       console.error("Error generating analysis:", error);
       setSleepAnalysis("수면 분석을 생성할 수 없습니다.");
@@ -154,14 +155,14 @@ export default function DreamJournal() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50 pt-12">
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50">
       <div className="max-w-4xl mx-auto">
         {/* Header with Back Button - iOS Safe Area */}
         <div
           className="pb-4 px-4 sticky top-0 bg-gradient-to-b from-purple-50 to-transparent z-10"
           style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
-          <div className="pt-4">
+          <div className="pt-12">
             <button
               onClick={() => router.push("/")}
               className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
@@ -189,7 +190,9 @@ export default function DreamJournal() {
           <div className="pb-6">
             <div className="text-center">
               <div className="text-6xl mb-4">✨</div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">꿈 일기</h1>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                Dream Journal
+              </h1>
               <p className="text-gray-600">
                 {new Date(sleepData.date).toLocaleDateString("ko-KR", {
                   year: "numeric",

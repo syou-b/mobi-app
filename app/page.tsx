@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HealthKitSleep, type SleepSample } from "capacitor-healthkit-sleep";
 import testData from "./testData.json";
+import {
+  setCurrentJournalDate,
+  saveJournal,
+  getJournalDates,
+} from "./lib/journalStorage";
 
 export default function Home() {
   const router = useRouter();
@@ -15,6 +20,7 @@ export default function Home() {
   const [useTestData, setUseTestData] = useState(false);
   const [hasJournal, setHasJournal] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [journalDates, setJournalDates] = useState<Set<string>>(new Set());
 
   const loadTestData = () => {
     setLoading(true);
@@ -34,17 +40,30 @@ export default function Home() {
     }
   };
 
+  const checkJournals = () => {
+    // 저널이 있는 모든 날짜 가져오기
+    const dates = getJournalDates();
+    setJournalDates(new Set(dates));
+  };
+
   useEffect(() => {
-    // 오늘 저널이 있는지 확인
-    const checkJournal = () => {
-      const narrative = localStorage.getItem("dreamNarrative");
-      setHasJournal(!!narrative);
+    checkJournals();
+    loadTestData();
+  }, []);
+
+  // 페이지로 돌아올 때마다 저널 다시 체크
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkJournals();
+      }
     };
 
-    checkJournal();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 자동으로 테스트 데이터 로드
-    loadTestData();
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -222,21 +241,29 @@ export default function Home() {
     const deepMinutes = calcTotalMinutes(deep);
     const remMinutes = calcTotalMinutes(rem);
 
+    // 이 날짜에 저널이 있는지 확인
+    const hasJournalForDate = journalDates.has(date);
+
     // 꿈 기록 시작 함수
     const handleStartDreamRecording = () => {
-      // 오늘의 수면 데이터를 localStorage에 저장
-      const sleepContext = {
-        date,
-        samples,
-        inBed,
-        asleep,
-        deepMinutes,
-        remMinutes,
-        coreMinutes: calcTotalMinutes(core),
-        awakeMinutes: calcTotalMinutes(awake),
-      };
+      // 현재 작업 중인 날짜 설정
+      setCurrentJournalDate(date);
 
-      localStorage.setItem("todaySleepData", JSON.stringify(sleepContext));
+      // 이 날짜의 수면 데이터 저장
+      saveJournal(date, {
+        date,
+        sleepData: {
+          date,
+          samples,
+          inBed,
+          asleep,
+          deepMinutes,
+          remMinutes,
+          coreMinutes: calcTotalMinutes(core),
+          awakeMinutes: calcTotalMinutes(awake),
+        },
+      });
+
       router.push("/dream-recording");
     };
 
@@ -357,20 +384,18 @@ export default function Home() {
           )}
         </div>
 
-        {/* 꿈 기록하기 버튼 - 오늘 수면에만 표시 */}
-        {isToday && (
-          <button
-            onClick={
-              hasJournal
-                ? () => router.push("/dream-journal")
-                : handleStartDreamRecording
-            }
-            className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">{hasJournal ? "📖" : "💭"}</span>
-            <span>{hasJournal ? "저널 보기" : "꿈 기록하기"}</span>
-          </button>
-        )}
+        {/* 꿈 기록하기 버튼 - 모든 날짜에 표시 */}
+        <button
+          onClick={
+            hasJournalForDate
+              ? () => router.push("/dream-journal")
+              : handleStartDreamRecording
+          }
+          className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+        >
+          <span className="text-xl">{hasJournalForDate ? "📖" : "💭"}</span>
+          <span>{hasJournalForDate ? "저널 보기" : "꿈 기록하기"}</span>
+        </button>
       </div>
     );
   };
@@ -393,14 +418,28 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 pt-8">
-          <div className="text-6xl mb-4">😴</div>
+        <div className="text-center mb-8 pt-16">
+          <div className="text-6xl mb-4">🌙</div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            수면 데이터 분석
+            Dream Journal
           </h1>
           <p className="text-gray-600">
-            Apple Health에서 수면 데이터를 가져옵니다
+            Health 수면 데이터를 바탕으로 꿈을 기록해보세요!
           </p>
+
+          {/* 임시 디버그 버튼 */}
+          <button
+            onClick={() => {
+              if (confirm("모든 저널 데이터를 삭제하시겠습니까?")) {
+                localStorage.clear();
+                alert("localStorage가 초기화되었습니다.");
+                window.location.reload();
+              }
+            }}
+            className="mt-4 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg"
+          >
+            🗑️ localStorage 초기화 (디버그용)
+          </button>
         </div>
 
         {/* Error Message */}

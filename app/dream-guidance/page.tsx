@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getCurrentJournal, updateCurrentJournal } from "../lib/journalStorage";
 
 interface Question {
   id: number;
@@ -32,21 +33,41 @@ export default function DreamGuidance() {
   const [initialDream, setInitialDream] = useState("");
 
   useEffect(() => {
-    // localStorage에서 데이터 로드
-    const sleepDataStr = localStorage.getItem("todaySleepData");
-    const dreamText = localStorage.getItem("initialDream");
+    // 현재 저널 로드
+    const journal = getCurrentJournal();
 
-    if (!sleepDataStr || !dreamText) {
+    if (!journal || !journal.sleepData || !journal.initialDream) {
       alert("데이터를 불러올 수 없습니다.");
       router.push("/");
       return;
     }
 
-    setSleepContext(JSON.parse(sleepDataStr));
-    setInitialDream(dreamText);
+    setSleepContext({
+      date: journal.date,
+      samples: journal.sleepData.samples,
+      deepMinutes: journal.sleepData.deepMinutes,
+      remMinutes: journal.sleepData.remMinutes,
+      coreMinutes: journal.sleepData.coreMinutes,
+      awakeMinutes: journal.sleepData.awakeMinutes,
+      inBed: journal.sleepData.inBed,
+      asleep: journal.sleepData.asleep,
+    });
+    setInitialDream(journal.initialDream);
 
     // LLM API 호출해서 질문 생성
-    generateQuestions(JSON.parse(sleepDataStr), dreamText);
+    generateQuestions(
+      {
+        date: journal.date,
+        samples: journal.sleepData.samples,
+        deepMinutes: journal.sleepData.deepMinutes,
+        remMinutes: journal.sleepData.remMinutes,
+        coreMinutes: journal.sleepData.coreMinutes,
+        awakeMinutes: journal.sleepData.awakeMinutes,
+        inBed: journal.sleepData.inBed,
+        asleep: journal.sleepData.asleep,
+      },
+      journal.initialDream
+    );
   }, []);
 
   const generateQuestions = async (sleepData: SleepContext, dream: string) => {
@@ -115,8 +136,8 @@ export default function DreamGuidance() {
   };
 
   const handleComplete = () => {
-    // 답변들을 localStorage에 저장
-    localStorage.setItem("dreamAnswers", JSON.stringify(questions));
+    // 답변들을 현재 저널에 저장
+    updateCurrentJournal({ answers: questions });
 
     console.log("Initial Dream:", initialDream);
     console.log("Answers:", questions);
@@ -145,96 +166,113 @@ export default function DreamGuidance() {
   const progress = ((currentStep + 1) / questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50 p-4">
+    <div className="min-h-screen bg-gradient-to-b from-purple-50 to-pink-50">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="pt-8 pb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"
-          >
-            <span>←</span>
-            <span>돌아가기</span>
-          </button>
-
-          {/* Progress Bar */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-semibold text-gray-700">
-                질문 {currentStep + 1} / {questions.length}
-              </span>
-              <span className="text-sm text-gray-500">
-                {Math.round(progress)}% 완료
-              </span>
-            </div>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+        {/* Header with Back Button - iOS Safe Area */}
+        <div
+          className="pb-4 px-4 sticky top-0 bg-gradient-to-b from-purple-50 to-transparent z-10"
+          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+        >
+          <div className="pt-12">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              <span className="font-medium">뒤로</span>
+            </button>
           </div>
         </div>
 
         {/* Question Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          {/* Question */}
-          <div className="mb-4">
-            <label className="block text-lg font-bold text-gray-800 mb-4">
-              {currentQuestion.question}
-            </label>
-            <textarea
-              value={currentAnswer}
-              onChange={(e) => setCurrentAnswer(e.target.value)}
-              placeholder="자유롭게 답변해주세요..."
-              className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400"
-              autoFocus
-            />
-          </div>
+        <div className="px-4">
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold text-gray-700">
+                  질문 {currentStep + 1} / {questions.length}
+                </span>
+                <span className="text-sm text-gray-500">
+                  {Math.round(progress)}% 완료
+                </span>
+              </div>
+              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
 
-          {/* Sleep Context */}
-          <div className="bg-blue-50 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-2">
-              <span className="text-xl">💡</span>
-              <div>
-                <div className="text-xs font-semibold text-blue-900 mb-1">
-                  수면 데이터 기반 인사이트
+            {/* Question */}
+            <div className="mb-4">
+              <label className="block text-lg font-bold text-gray-800 mb-4">
+                {currentQuestion.question}
+              </label>
+              <textarea
+                value={currentAnswer}
+                onChange={(e) => setCurrentAnswer(e.target.value)}
+                placeholder="자유롭게 답변해주세요..."
+                className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl focus:border-purple-400 focus:outline-none resize-none text-gray-800 placeholder-gray-400"
+                autoFocus
+              />
+            </div>
+
+            {/* Sleep Context */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <span className="text-xl">💡</span>
+                <div>
+                  <div className="text-xs font-semibold text-blue-900 mb-1">
+                    수면 데이터 기반 인사이트
+                  </div>
+                  <p className="text-sm text-blue-800">
+                    {currentQuestion.context}
+                  </p>
                 </div>
-                <p className="text-sm text-blue-800">
-                  {currentQuestion.context}
-                </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Initial Dream Reference */}
-        {/* {initialDream && (
-          <div className="bg-purple-50 rounded-2xl p-4 mb-6">
-            <div className="text-xs font-semibold text-purple-900 mb-2">
-              처음에 적은 내용:
-            </div>
-            <p className="text-sm text-purple-800 italic">"{initialDream}"</p>
-          </div>
-        )} */}
-
         {/* Action Buttons */}
-        <div className="space-y-3 pb-8">
-          <button
-            onClick={handleNext}
-            disabled={!currentAnswer.trim()}
-            className="w-full py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {currentStep < questions.length - 1 ? "다음 질문" : "완료하기"}
-          </button>
+        <div className="px-4">
+          <div className="space-y-3 pb-8">
+            <button
+              onClick={handleNext}
+              disabled={!currentAnswer.trim()}
+              className="w-full py-4 px-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {currentStep < questions.length - 1 ? "다음 질문" : "완료하기"}
+            </button>
 
-          <button
-            onClick={handleSkip}
-            className="w-full py-3 px-6 text-gray-600 hover:text-gray-800 font-medium"
-          >
-            건너뛰기
-          </button>
+            <button
+              onClick={handleSkip}
+              className="w-full py-3 px-6 text-gray-600 hover:text-gray-800 font-medium"
+            >
+              건너뛰기
+            </button>
+          </div>
         </div>
+
+        {/* Bottom Padding for Safe Area */}
+        <div
+          className="pb-8"
+          style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}
+        ></div>
       </div>
     </div>
   );
