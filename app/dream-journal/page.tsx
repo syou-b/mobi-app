@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentJournal, updateCurrentJournal } from "../lib/journalStorage";
+import { SleepTimeline, SleepStats } from "../components/SleepTimeline";
 
 interface SleepContext {
   date: string;
@@ -72,7 +73,7 @@ export default function DreamJournal() {
 
     setSleepData(journal.sleepData);
     setNarrative(journal.narrative);
-    setImageUrl(journal.image || "");
+    setImageUrl(journal.image || ""); // 이미지 없을 수 있음 (localStorage 용량 이슈)
     setInitialDream(journal.initialDream);
 
     // 저장된 분석이 있으면 사용, 없으면 생성
@@ -113,25 +114,15 @@ export default function DreamJournal() {
       updateCurrentJournal({ sleepAnalysis: data.analysis });
     } catch (error) {
       console.error("Error generating analysis:", error);
-      setSleepAnalysis("수면 분석을 생성할 수 없습니다.");
+
+      // Quota 초과 시 기본 분석 제공
+      const fallbackAnalysis = `오늘 밤 총 ${Math.round(((sleepContext.deepMinutes + sleepContext.remMinutes + sleepContext.coreMinutes) / 60) * 10) / 10}시간의 수면을 취하셨네요. 깊은 수면은 ${Math.round(sleepContext.deepMinutes)}분, REM 수면은 ${Math.round(sleepContext.remMinutes)}분이었습니다. 충분한 휴식을 취하셨기를 바랍니다.`;
+
+      setSleepAnalysis(fallbackAnalysis);
+      updateCurrentJournal({ sleepAnalysis: fallbackAnalysis });
     } finally {
       setIsGeneratingAnalysis(false);
     }
-  };
-
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  };
-
-  const formatMinutes = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}시간 ${mins}분`;
   };
 
   if (isGeneratingAnalysis) {
@@ -162,7 +153,7 @@ export default function DreamJournal() {
           className="pb-4 px-4 sticky top-0 bg-gradient-to-b from-purple-50 to-transparent z-10"
           style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
-          <div className="pt-12">
+          <div className="pt-8">
             <button
               onClick={() => router.push("/")}
               className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
@@ -190,9 +181,7 @@ export default function DreamJournal() {
           <div className="pb-6">
             <div className="text-center">
               <div className="text-6xl mb-4">✨</div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                Dream Journal
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">꿈 일기</h1>
               <p className="text-gray-600">
                 {new Date(sleepData.date).toLocaleDateString("ko-KR", {
                   year: "numeric",
@@ -213,112 +202,19 @@ export default function DreamJournal() {
             {/* Sleep Timeline Visualization */}
             {sleepData.inBed && (
               <div className="space-y-4">
-                {/* Visual Timeline */}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>{formatTime(sleepData.inBed.startDate)}</span>
-                    <span>{formatTime(sleepData.inBed.endDate)}</span>
-                  </div>
-                  <div className="relative h-12 bg-gray-100 rounded-lg overflow-hidden">
-                    {sleepData.samples
-                      .filter((s: any) =>
-                        ["deep", "core", "rem", "awake"].includes(
-                          s.categoryType
-                        )
-                      )
-                      .map((stage: any, idx: number) => {
-                        const bedStart = new Date(
-                          sleepData.inBed.startDate
-                        ).getTime();
-                        const bedEnd = new Date(
-                          sleepData.inBed.endDate
-                        ).getTime();
-                        const totalDuration = bedEnd - bedStart;
-
-                        const stageStart = new Date(stage.startDate).getTime();
-                        const stageEnd = new Date(stage.endDate).getTime();
-                        const left =
-                          ((stageStart - bedStart) / totalDuration) * 100;
-                        const width =
-                          ((stageEnd - stageStart) / totalDuration) * 100;
-
-                        const colorMap: { [key: string]: string } = {
-                          deep: "bg-indigo-600",
-                          core: "bg-blue-400",
-                          rem: "bg-purple-400",
-                          awake: "bg-orange-300",
-                        };
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`absolute h-full ${colorMap[stage.categoryType]}`}
-                            style={{
-                              left: `${left}%`,
-                              width: `${width}%`,
-                            }}
-                          />
-                        );
-                      })}
-                  </div>
-
-                  {/* Legend */}
-                  <div className="flex flex-wrap gap-3 mt-3 text-xs">
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-indigo-600 rounded"></div>
-                      <span className="text-gray-600">깊은 수면</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-blue-400 rounded"></div>
-                      <span className="text-gray-600">코어 수면</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-purple-400 rounded"></div>
-                      <span className="text-gray-600">REM</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-orange-300 rounded"></div>
-                      <span className="text-gray-600">깨어있음</span>
-                    </div>
-                  </div>
-                </div>
+                <SleepTimeline
+                  inBed={sleepData.inBed}
+                  samples={sleepData.samples}
+                  showLegend={true}
+                />
 
                 {/* Summary Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                  <div className="bg-blue-50 rounded-lg p-3">
-                    <div className="text-xs text-gray-500 mb-1">😴 총 수면</div>
-                    <div className="text-lg font-semibold text-blue-600">
-                      {sleepData.asleep
-                        ? formatMinutes(
-                            (new Date(sleepData.asleep.endDate).getTime() -
-                              new Date(sleepData.asleep.startDate).getTime()) /
-                              60000
-                          )
-                        : "N/A"}
-                    </div>
-                  </div>
-                  <div className="bg-indigo-50 rounded-lg p-3">
-                    <div className="text-xs text-gray-500 mb-1">
-                      🌙 깊은 수면
-                    </div>
-                    <div className="text-lg font-semibold text-indigo-600">
-                      {formatMinutes(sleepData.deepMinutes)}
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-3">
-                    <div className="text-xs text-gray-500 mb-1">💭 REM</div>
-                    <div className="text-lg font-semibold text-purple-600">
-                      {formatMinutes(sleepData.remMinutes)}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-xs text-gray-500 mb-1">⏰ 시간</div>
-                    <div className="text-sm font-semibold text-gray-600">
-                      {formatTime(sleepData.inBed.startDate)} -{" "}
-                      {formatTime(sleepData.inBed.endDate)}
-                    </div>
-                  </div>
-                </div>
+                <SleepStats
+                  deepMinutes={sleepData.deepMinutes}
+                  coreMinutes={sleepData.coreMinutes}
+                  remMinutes={sleepData.remMinutes}
+                  inBed={sleepData.inBed}
+                />
               </div>
             )}
           </div>

@@ -9,6 +9,7 @@ import {
   saveJournal,
   getJournalDates,
 } from "./lib/journalStorage";
+import { SleepTimeline, SleepStats } from "./components/SleepTimeline";
 
 export default function Home() {
   const router = useRouter();
@@ -240,6 +241,7 @@ export default function Home() {
 
     const deepMinutes = calcTotalMinutes(deep);
     const remMinutes = calcTotalMinutes(rem);
+    const coreMinutes = calcTotalMinutes(core);
 
     // 이 날짜에 저널이 있는지 확인
     const hasJournalForDate = journalDates.has(date);
@@ -269,18 +271,6 @@ export default function Home() {
 
     if (!inBed) return null;
 
-    const bedStart = new Date(inBed.startDate).getTime();
-    const bedEnd = new Date(inBed.endDate).getTime();
-    const totalDuration = bedEnd - bedStart;
-
-    const formatTime = (date: Date) => {
-      return date.toLocaleTimeString("ko-KR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
-    };
-
     return (
       <div
         className={`bg-white rounded-2xl shadow-lg p-6 ${isToday ? "ring-2 ring-blue-400" : ""}`}
@@ -298,91 +288,16 @@ export default function Home() {
 
         {/* 타임라인 */}
         <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-            <span>{formatTime(new Date(inBed.startDate))}</span>
-            <span>{formatTime(new Date(inBed.endDate))}</span>
-          </div>
-          <div className="relative h-12 bg-gray-100 rounded-lg overflow-hidden">
-            {[...deep, ...core, ...rem, ...awake].map((stage, idx) => {
-              const stageStart = new Date(stage.startDate).getTime();
-              const stageEnd = new Date(stage.endDate).getTime();
-              const left = ((stageStart - bedStart) / totalDuration) * 100;
-              const width = ((stageEnd - stageStart) / totalDuration) * 100;
-
-              const colorMap: { [key: string]: string } = {
-                deep: "bg-indigo-600",
-                core: "bg-blue-400",
-                rem: "bg-purple-400",
-                awake: "bg-orange-300",
-              };
-
-              return (
-                <div
-                  key={idx}
-                  className={`absolute h-full ${colorMap[stage.categoryType]}`}
-                  style={{
-                    left: `${left}%`,
-                    width: `${width}%`,
-                  }}
-                />
-              );
-            })}
-          </div>
-
-          {/* 범례 */}
-          <div className="flex flex-wrap gap-3 mt-3 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-indigo-600 rounded"></div>
-              <span className="text-gray-600">깊은 수면</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-blue-400 rounded"></div>
-              <span className="text-gray-600">코어 수면</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-purple-400 rounded"></div>
-              <span className="text-gray-600">REM</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 bg-orange-300 rounded"></div>
-              <span className="text-gray-600">깨어있음</span>
-            </div>
-          </div>
+          <SleepTimeline inBed={inBed} samples={samples} showLegend={true} />
         </div>
 
         {/* 통계 */}
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs text-gray-500 mb-1">🛏️ 침대</div>
-            <div className="text-lg font-semibold text-gray-800">
-              {calculateDuration(inBed.startDate, inBed.endDate)}
-            </div>
-          </div>
-          {asleep && (
-            <div className="bg-blue-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500 mb-1">😴 수면</div>
-              <div className="text-lg font-semibold text-blue-600">
-                {calculateDuration(asleep.startDate, asleep.endDate)}
-              </div>
-            </div>
-          )}
-          {deepMinutes > 0 && (
-            <div className="bg-indigo-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500 mb-1">🌙 깊은 수면</div>
-              <div className="text-lg font-semibold text-indigo-600">
-                {formatMinutes(deepMinutes)}
-              </div>
-            </div>
-          )}
-          {remMinutes > 0 && (
-            <div className="bg-purple-50 rounded-lg p-3">
-              <div className="text-xs text-gray-500 mb-1">💭 REM</div>
-              <div className="text-lg font-semibold text-purple-600">
-                {formatMinutes(remMinutes)}
-              </div>
-            </div>
-          )}
-        </div>
+        <SleepStats
+          deepMinutes={deepMinutes}
+          coreMinutes={coreMinutes}
+          remMinutes={remMinutes}
+          inBed={inBed}
+        />
 
         {/* 꿈 기록하기 버튼 - 모든 날짜에 표시 */}
         <button
@@ -418,13 +333,20 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 pt-16">
-          <div className="text-6xl mb-4">🌙</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Dream Journal
+        <div className="text-center mb-8 pt-8">
+          <div className="relative inline-block mb-6">
+            <div className="text-7xl animate-pulse">🌙</div>
+            <div className="absolute -top-2 -right-2 text-4xl">✨</div>
+            <div className="absolute -bottom-1 -left-2 text-3xl">💭</div>
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">
+            꿈 일기
           </h1>
-          <p className="text-gray-600">
-            Health 수면 데이터를 바탕으로 꿈을 기록해보세요!
+          <p className="text-gray-600 text-lg">
+            수면 데이터를 바탕으로 꿈을 기록하고
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            AI가 만드는 나만의 꿈 이야기를 경험해보세요
           </p>
 
           {/* 임시 디버그 버튼 */}
