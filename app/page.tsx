@@ -18,28 +18,9 @@ export default function Home() {
   const [sleepData, setSleepData] = useState<SleepSample[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useTestData, setUseTestData] = useState(false);
   const [hasJournal, setHasJournal] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [journalDates, setJournalDates] = useState<Set<string>>(new Set());
-
-  const loadTestData = () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // testData.json의 구조가 { samples: [...] } 형태
-      const samples = (testData as any).samples || testData;
-      setSleepData(samples as SleepSample[]);
-      setUseTestData(true);
-      console.log("Test data loaded:", samples.length, "samples");
-    } catch (err: any) {
-      setError(`테스트 데이터 로드 실패: ${err.message || err}`);
-      console.error("Test data load failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const checkJournals = () => {
     // 저널이 있는 모든 날짜 가져오기
@@ -49,7 +30,6 @@ export default function Home() {
 
   useEffect(() => {
     checkJournals();
-    // loadTestData는 권한 승인 후에 호출
   }, []);
 
   // 페이지로 돌아올 때마다 저널 다시 체크
@@ -85,18 +65,11 @@ export default function Home() {
         if (!isAuthorized) {
           setError("권한이 거부되었습니다. 설정에서 권한을 허용해주세요.");
         } else {
-          // 데모용: 권한 승인 후 테스트 데이터 로드
-          // 실제 배포 시에는 fetchSleepData()로 변경
-          loadTestData();
-
-          // 실제 HealthKit 데이터를 사용할 때:
-          // await fetchSleepData();
+          fetchSleepData();
         }
       } catch (err: any) {
         setError(`권한 요청 실패: ${err.message || JSON.stringify(err)}`);
         console.error("Authorization failed:", err);
-        // 데모용: 에러 발생 시에도 테스트 데이터 로드
-        loadTestData();
       } finally {
         setLoading(false);
       }
@@ -108,7 +81,6 @@ export default function Home() {
   const fetchSleepData = async (days: number = 30) => {
     setLoading(true);
     setError(null);
-    setUseTestData(false);
 
     try {
       const endDate = new Date();
@@ -135,14 +107,10 @@ export default function Home() {
         console.warn(
           `최근 ${days}일간 수면 데이터가 없습니다. 테스트 데이터를 로드합니다.`
         );
-        // 데이터 없으면 테스트 데이터 로드
-        loadTestData();
       }
     } catch (err: any) {
       setError(`데이터 조회 실패: ${err.message || err}`);
       console.error("Fetch failed:", err);
-      // 에러 발생 시 테스트 데이터 로드
-      loadTestData();
     } finally {
       setLoading(false);
     }
