@@ -49,7 +49,7 @@ export default function Home() {
 
   useEffect(() => {
     checkJournals();
-    loadTestData();
+    // loadTestData는 권한 승인 후에 호출
   }, []);
 
   // 페이지로 돌아올 때마다 저널 다시 체크
@@ -84,10 +84,19 @@ export default function Home() {
 
         if (!isAuthorized) {
           setError("권한이 거부되었습니다. 설정에서 권한을 허용해주세요.");
+        } else {
+          // 데모용: 권한 승인 후 테스트 데이터 로드
+          // 실제 배포 시에는 fetchSleepData()로 변경
+          loadTestData();
+
+          // 실제 HealthKit 데이터를 사용할 때:
+          // await fetchSleepData();
         }
       } catch (err: any) {
         setError(`권한 요청 실패: ${err.message || JSON.stringify(err)}`);
         console.error("Authorization failed:", err);
+        // 데모용: 에러 발생 시에도 테스트 데이터 로드
+        loadTestData();
       } finally {
         setLoading(false);
       }
@@ -96,45 +105,48 @@ export default function Home() {
     initializeHealthKit();
   }, []);
 
-  // const fetchSleepData = async (days: number = 365) => {
-  //   setLoading(true);
-  //   setError(null);
-  //   setUseTestData(false);
+  const fetchSleepData = async (days: number = 30) => {
+    setLoading(true);
+    setError(null);
+    setUseTestData(false);
 
-  //   try {
-  //     const endDate = new Date();
-  //     const startDate = new Date();
-  //     startDate.setDate(startDate.getDate() - days);
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
 
-  //     const result = await HealthKitSleep.readSleepSamples({
-  //       startDate: startDate.toISOString(),
-  //       endDate: endDate.toISOString(),
-  //     });
+      console.log(
+        "Fetching sleep data from",
+        startDate.toISOString(),
+        "to",
+        endDate.toISOString()
+      );
 
-  //     console.log("Received data:", result);
+      const result = await HealthKitSleep.readSleepSamples({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      });
 
-  //     setSleepData(result.samples || []);
+      console.log("Received data:", result);
 
-  //     if ((result.samples || []).length === 0) {
-  //       setError(`선택한 기간(${days}일)에 수면 데이터가 없습니다.`);
-  //     }
-  //   } catch (err: any) {
-  //     setError(`데이터 조회 실패: ${err.message || err}`);
-  //     console.error("Fetch failed:", err);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+      setSleepData(result.samples || []);
 
-  const calculateDuration = (start: string, end: string) => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffMs = endDate.getTime() - startDate.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}시간 ${minutes}분`;
+      if ((result.samples || []).length === 0) {
+        console.warn(
+          `최근 ${days}일간 수면 데이터가 없습니다. 테스트 데이터를 로드합니다.`
+        );
+        // 데이터 없으면 테스트 데이터 로드
+        loadTestData();
+      }
+    } catch (err: any) {
+      setError(`데이터 조회 실패: ${err.message || err}`);
+      console.error("Fetch failed:", err);
+      // 에러 발생 시 테스트 데이터 로드
+      loadTestData();
+    } finally {
+      setLoading(false);
+    }
   };
-
   // 날짜별로 수면 데이터 그룹화 (inBed 기준)
   const groupByDate = (samples: SleepSample[]) => {
     // 로컬 날짜 문자열 추출 함수 (YYYY-MM-DD)
@@ -233,12 +245,6 @@ export default function Home() {
       }, 0);
     };
 
-    const formatMinutes = (minutes: number) => {
-      const hours = Math.floor(minutes / 60);
-      const mins = Math.round(minutes % 60);
-      return `${hours}시간 ${mins}분`;
-    };
-
     const deepMinutes = calcTotalMinutes(deep);
     const remMinutes = calcTotalMinutes(rem);
     const coreMinutes = calcTotalMinutes(core);
@@ -333,24 +339,17 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 pt-8">
-          <div className="relative inline-block mb-6">
-            <div className="text-7xl animate-pulse">🌙</div>
-            <div className="absolute -top-2 -right-2 text-4xl">✨</div>
-            <div className="absolute -bottom-1 -left-2 text-3xl">💭</div>
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">
-            꿈 일기
+        <div className="text-center mb-8 pt-16">
+          <div className="text-7xl mb-8 ">🌙</div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            Dream Journal
           </h1>
-          <p className="text-gray-600 text-lg">
-            수면 데이터를 바탕으로 꿈을 기록하고
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            AI가 만드는 나만의 꿈 이야기를 경험해보세요
+          <p className="text-gray-600">
+            Health 수면 데이터를 바탕으로 꿈을 기록해보세요!
           </p>
 
           {/* 임시 디버그 버튼 */}
-          <button
+          {/* <button
             onClick={() => {
               if (confirm("모든 저널 데이터를 삭제하시겠습니까?")) {
                 localStorage.clear();
@@ -361,7 +360,7 @@ export default function Home() {
             className="mt-4 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg"
           >
             🗑️ localStorage 초기화 (디버그용)
-          </button>
+          </button> */}
         </div>
 
         {/* Error Message */}
