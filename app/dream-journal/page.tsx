@@ -181,7 +181,9 @@ export default function DreamJournal() {
           <div className="pb-6">
             <div className="text-center">
               <div className="text-6xl mb-4">✨</div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">꿈 일기</h1>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                Dream Journal
+              </h1>
               <p className="text-gray-600">
                 {new Date(sleepData.date).toLocaleDateString("ko-KR", {
                   year: "numeric",
